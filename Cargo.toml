@@ -1,0 +1,42 @@
+[package]
+name = "memory-budget"
+version = "0.1.0"
+description = "Process memory budgeting and adaptive cache-capacity coordination"
+authors = ["Jacobus Geluk <jacobus.geluk@dataroad.com>"]
+edition = "2024"
+rust-version = "1.89"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/legra-ai/memory-budget"
+documentation = "https://docs.rs/memory-budget"
+readme = "README.md"
+keywords = ["memory", "budget", "cache", "rss", "jemalloc"]
+categories = ["caching", "memory-management", "asynchronous"]
+build = "build.rs"
+include = [
+    "Cargo.toml",
+    "README.md",
+    "LICENSE-APACHE",
+    "LICENSE-MIT",
+    "build.rs",
+    "src/**/*.rs",
+]
+
+[dependencies]
+sysinfo = "0.38"
+tokio = { version = "1", default-features = false, features = ["macros", "rt", "time"] }
+tracing = "0.1"
+tikv-jemalloc-ctl = { version = "0.6", default-features = false, features = ["stats"], optional = true }
+
+[build-dependencies]
+rhusky = "0.0.6"
+
+[features]
+default = []
+jemalloc = ["dep:tikv-jemalloc-ctl"]
+heap-profiling = ["jemalloc"]
+
+[lints.rust]
+missing_docs = "deny"
+
+[lints.clippy]
+all = "deny"
