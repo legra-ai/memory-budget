@@ -29,11 +29,6 @@ impl LeaseGuard {
     pub fn bytes(&self) -> u64 {
         self.bytes
     }
-
-    #[cfg(test)]
-    pub(crate) fn accounting_is_live(&self) -> bool {
-        Arc::strong_count(&self.state) > 0
-    }
 }
 
 impl Drop for LeaseGuard {
