@@ -10,15 +10,9 @@ pub struct BudgetSnapshot {
     pub target_bytes: u64,
     /// Target after active-lease subtraction.
     pub effective_target_bytes: u64,
-    /// **Effective** RSS the policy used this tick. When jemalloc
-    /// stats are present this is `jemalloc.resident_bytes` (the true
-    /// resident footprint); otherwise it falls back to the sysinfo
-    /// reading in [`BudgetSnapshot::rss_sysinfo_bytes`].
-    ///
-    /// On some platforms, the operating-system reading can diverge
-    /// materially from the allocator's resident estimate. Driving the
-    /// policy off `jemalloc.resident` keeps grow/shrink decisions aligned
-    /// with the allocator when those statistics are available.
+    /// Effective usage used by the policy: maximum of OS process usage,
+    /// jemalloc residency and live heap allocation. These overlap and must
+    /// not be added, nor may a smaller allocator reading hide other memory.
     pub rss_bytes: u64,
     /// Raw sysinfo RSS reading (`phys_footprint` on macOS, RSS on
     /// Linux). Kept for the gap diagnostic — compare against

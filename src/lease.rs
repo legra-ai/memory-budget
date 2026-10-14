@@ -1,6 +1,6 @@
 //! RAII lease returned by [`MemoryBudget::lease`](crate::MemoryBudget::lease).
 
-use std::sync::Weak;
+use std::sync::Arc;
 
 use crate::budget::BudgetState;
 
@@ -10,16 +10,17 @@ use crate::budget::BudgetState;
 /// `bytes()`. The reduction is released when the guard is dropped.
 ///
 /// Issued by [`MemoryBudget::lease`](crate::MemoryBudget::lease).
-/// The guard holds a `Weak` reference to the budget so that a guard
-/// outliving its budget does not leak the budget's allocation.
+/// The guard owns the shared accounting state until release, even when the
+/// public budget handle has been dropped. It never releases a reservation
+/// merely because work moved to another task or queue.
 #[must_use = "dropping the LeaseGuard immediately releases the lease"]
 pub struct LeaseGuard {
     bytes: u64,
-    state: Weak<BudgetState>,
+    state: Arc<BudgetState>,
 }
 
 impl LeaseGuard {
-    pub(crate) fn new(bytes: u64, state: Weak<BudgetState>) -> Self {
+    pub(crate) fn new(bytes: u64, state: Arc<BudgetState>) -> Self {
         Self { bytes, state }
     }
 
@@ -32,8 +33,6 @@ impl LeaseGuard {
 
 impl Drop for LeaseGuard {
     fn drop(&mut self) {
-        if let Some(state) = self.state.upgrade() {
-            state.release_lease(self.bytes);
-        }
+        self.state.release_lease(self.bytes);
     }
 }

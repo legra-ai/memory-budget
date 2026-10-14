@@ -24,6 +24,37 @@ test.
 The budget does not own cache entries, queue work, or payloads. It only
 coordinates the explicit byte measurements supplied by its participants.
 
+## Allocation reservations
+
+Call `try_lease(bytes)` **before** allocating a payload. Outstanding leases
+share one finite allowance equal to `target_bytes`; an oversized or competing
+request returns `ReservationError` without changing the counter or allocating
+a payload. Transfer the guard with ownership and drop it only after the owned
+allocation is released. `lease(bytes)` uses the same accounting and panics on
+refusal. It no longer permits overcommit. Zero-capacity budgets are invalid.
+
+```rust
+use memory_budget::{BudgetConfig, MemoryBudget};
+
+let budget = MemoryBudget::new(BudgetConfig::new(1024));
+let first = budget.try_lease(768).expect("first allocation fits");
+assert!(budget.try_lease(257).is_err());
+drop(first);
+assert!(budget.try_lease(1024).is_ok());
+```
+
+This enforces the sum of reservations, **not a whole-process allocation cap**.
+Unregistered allocations remain outside admission, and cache ceilings shrink
+on coordination ticks rather than synchronously at reservation time. The
+application must govern baseline, caches, copies, decoder expansion and native
+allocations before claiming a process memory bound. The optional abort ceiling
+remains a reactive safety mechanism.
+
+`observed_usage_bytes()` samples memory without a coordination tick. It and
+the tick use the maximum of OS process usage, jemalloc residency and live heap
+allocation. These overlapping measurements must not be added, and a smaller
+allocator reading must not hide other process memory.
+
 ## Example
 
 ```rust

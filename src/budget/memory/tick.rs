@@ -25,10 +25,8 @@ impl MemoryBudget {
         if let Some(profiler) = self.state.heap_profiler.as_ref() {
             profiler.maybe_dump(snapshot.rss_bytes);
         }
-        // Check the ceiling against the *effective* RSS (jemalloc
-        // resident when present), not the sysinfo reading — on macOS
-        // the latter is compressed-footprint and would never trip a
-        // ceiling that the real allocation has already blown past.
+        // Check all observed memory: neither compression nor allocations
+        // outside jemalloc may conceal an overrun.
         if let Some(ceiling) = self.state.config.hard_ceiling_bytes()
             && snapshot.rss_bytes > ceiling
         {
@@ -62,9 +60,8 @@ impl MemoryBudget {
     }
 
     /// Apply one reapportionment. `rss_sysinfo_bytes` is the raw
-    /// sysinfo reading; the policy runs off the **effective** RSS —
-    /// `jemalloc.resident_bytes` when jemalloc stats are present,
-    /// else the sysinfo value (see [`BudgetSnapshot::rss_bytes`]).
+    /// sysinfo reading; the policy uses the maximum of OS process usage,
+    /// jemalloc residency and live allocated bytes.
     fn run_tick(&self, rss_sysinfo_bytes: u64) -> BudgetSnapshot {
         let effective_target = self
             .state
@@ -72,17 +69,7 @@ impl MemoryBudget {
             .target_bytes()
             .saturating_sub(self.state.active_lease_bytes.load(Ordering::Relaxed));
         let jemalloc = self.state.jemalloc.read();
-        // Prefer jemalloc's resident estimate as the RSS signal: on
-        // macOS sysinfo's phys_footprint runs far below the real
-        // allocation (compression), which would leave the policy
-        // permanently in `grow`. Fall back to sysinfo when jemalloc
-        // stats are absent (non-jemalloc binaries / mallctl init
-        // failure → resident reads 0).
-        let rss_bytes = if jemalloc.resident_bytes > 0 {
-            jemalloc.resident_bytes
-        } else {
-            rss_sysinfo_bytes
-        };
+        let rss_bytes = jemalloc.observed_usage_bytes(rss_sysinfo_bytes);
         let live = self.live_views();
         let previous_cache_bytes = self.state.previous_cache_bytes.load(Ordering::Relaxed);
         let previous_cache_count = self.state.previous_cache_count.load(Ordering::Relaxed) as u32;

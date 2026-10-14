@@ -65,12 +65,11 @@ pub(crate) struct BudgetState {
 
 impl BudgetState {
     pub(crate) fn release_lease(&self, bytes: u64) {
-        // Subtract while clamping at zero. A misuse where the caller
-        // requested more than the current outstanding total must not
-        // underflow; we log a warning and saturate instead.
         let mut current = self.active_lease_bytes.load(Ordering::Relaxed);
         loop {
-            let next = current.saturating_sub(bytes);
+            let next = current
+                .checked_sub(bytes)
+                .expect("memory reservation release exceeds outstanding bytes");
             match self.active_lease_bytes.compare_exchange(
                 current,
                 next,

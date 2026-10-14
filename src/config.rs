@@ -39,6 +39,7 @@ impl BudgetConfig {
     /// Build a config explicitly. Useful for tests.
     #[must_use]
     pub fn new(target_bytes: u64) -> Self {
+        assert!(target_bytes > 0, "memory target must be greater than zero");
         Self {
             target_bytes,
             hard_ceiling_bytes: None,
