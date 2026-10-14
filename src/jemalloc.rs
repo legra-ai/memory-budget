@@ -47,6 +47,19 @@ pub struct JemallocStats {
     pub retained_bytes: u64,
 }
 
+impl JemallocStats {
+    /// Conservatively reconcile process-wide and allocator measurements.
+    ///
+    /// These are overlapping views, so take their maximum rather than adding
+    /// them or allowing a smaller allocator reading to hide other memory.
+    #[must_use]
+    pub fn observed_usage_bytes(self, process_bytes: u64) -> u64 {
+        process_bytes
+            .max(self.resident_bytes)
+            .max(self.allocated_bytes)
+    }
+}
+
 /// "What does jemalloc say about our memory usage right now?"
 ///
 /// Implementations must be cheap (the budget calls

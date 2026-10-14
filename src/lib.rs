@@ -28,3 +28,6 @@ mod tests;
 
 #[cfg(test)]
 mod reservation_tests;
+
+#[cfg(test)]
+mod measurement_tests;

@@ -17,6 +17,19 @@ const MIN_RESULT_CHANNEL_BYTES: u64 = 256 * 1024;
 const MAX_RESULT_CHANNEL_BYTES: u64 = 8 * 1024 * 1024;
 
 impl MemoryBudget {
+    /// Observe current process/allocator usage without running a cache tick.
+    ///
+    /// This is a measurement, not an allocation reservation. The maximum of
+    /// process usage, allocator residency and live heap bytes protects against
+    /// both compressed pages and allocations outside the configured allocator.
+    #[must_use]
+    pub fn observed_usage_bytes(&self) -> u64 {
+        self.state
+            .jemalloc
+            .read()
+            .observed_usage_bytes(self.state.rss.read_rss_bytes())
+    }
+
     /// Reserve `bytes`, panicking if outstanding leases would exceed the target.
     ///
     /// Use [`Self::try_lease`] when exhaustion is an expected refusal. The
