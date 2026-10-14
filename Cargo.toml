@@ -26,7 +26,7 @@ include = [
 sysinfo = "0.38"
 tokio = { version = "1", default-features = false, features = ["macros", "rt", "time"] }
 tracing = "0.1"
-tikv-jemalloc-ctl = { version = "0.6", default-features = false, features = ["stats"], optional = true }
+tikv-jemalloc-ctl = { version = "0.7", default-features = false, features = ["stats"], optional = true }
 
 [build-dependencies]
 rhusky = "0.0.6"
