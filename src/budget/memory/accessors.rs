@@ -5,6 +5,7 @@ use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use super::handle::MemoryBudget;
+use crate::ReservationError;
 use crate::lease::LeaseGuard;
 
 const EXECUTOR_SPILL_TARGET_DIVISOR: u64 = 16;
@@ -16,15 +17,49 @@ const MIN_RESULT_CHANNEL_BYTES: u64 = 256 * 1024;
 const MAX_RESULT_CHANNEL_BYTES: u64 = 8 * 1024 * 1024;
 
 impl MemoryBudget {
-    /// Borrow `bytes` of slack from the budget. While the returned
-    /// guard is alive, the effective target is reduced by `bytes`.
-    /// Releases on drop.
+    /// Reserve `bytes`, panicking if outstanding leases would exceed the target.
+    ///
+    /// Use [`Self::try_lease`] when exhaustion is an expected refusal. The
+    /// reservation must precede allocation and follow its ownership to release.
+    /// This bounds outstanding reservations, not unregistered allocations.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the aggregate reservation would exceed the target.
     #[must_use = "dropping the guard immediately releases the lease"]
     pub fn lease(&self, bytes: u64) -> LeaseGuard {
-        self.state
-            .active_lease_bytes
-            .fetch_add(bytes, Ordering::Relaxed);
-        LeaseGuard::new(bytes, Arc::downgrade(&self.state))
+        self.try_lease(bytes)
+            .unwrap_or_else(|error| panic!("{error}"))
+    }
+
+    /// Reserve bytes atomically without exceeding the aggregate lease target.
+    ///
+    /// Registered cache ceilings are reduced by active leases on the next
+    /// coordination tick. Existing allocations are not synchronously evicted;
+    /// callers must account for cache/baseline ownership separately before
+    /// claiming an enforced whole-process allocation bound.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ReservationError`] without changing accounting when the
+    /// request cannot fit. No payload is allocated and no waiter is queued.
+    pub fn try_lease(&self, bytes: u64) -> Result<LeaseGuard, ReservationError> {
+        let capacity = self.target_bytes();
+        let mut reserved = self.state.active_lease_bytes.load(Ordering::Relaxed);
+        loop {
+            let Some(next) = reserved.checked_add(bytes).filter(|next| *next <= capacity) else {
+                return Err(ReservationError::new(bytes, reserved, capacity));
+            };
+            match self.state.active_lease_bytes.compare_exchange_weak(
+                reserved,
+                next,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => return Ok(LeaseGuard::new(bytes, Arc::clone(&self.state))),
+                Err(observed) => reserved = observed,
+            }
+        }
     }
 
     /// Soft RSS target in bytes, before any lease deductions.
@@ -33,9 +68,7 @@ impl MemoryBudget {
         self.state.config.target_bytes()
     }
 
-    /// Effective target after subtracting active leases. Saturates
-    /// at zero if leases ever exceed the target (a misuse, but the
-    /// budget refuses to underflow).
+    /// Effective target after subtracting admitted active leases.
     #[must_use]
     pub fn effective_target_bytes(&self) -> u64 {
         self.state
