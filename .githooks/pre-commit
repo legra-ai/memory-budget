@@ -11,7 +11,7 @@ if [ -z "$RUST_FILES" ]; then
 fi
 
 echo "Running ./scripts/fmt.sh --check..."
-if ! ./scripts/fmt.sh -- --check; then
+if ! ./scripts/fmt.sh --check; then
     echo "Format check failed. Run: ./scripts/fmt.sh"
     exit 1
 fi
