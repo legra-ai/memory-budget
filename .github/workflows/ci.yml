@@ -16,8 +16,9 @@ jobs:
         with:
           toolchain: 1.99.1
           components: rustfmt, clippy
-      - uses: dtolnay/rust-toolchain@nightly-2026-10-16
+      - uses: dtolnay/rust-toolchain@nightly
         with:
+          toolchain: nightly-2026-10-16
           components: rustfmt
       - run: cargo +nightly-2026-10-16 fmt --all -- --check
       - run: cargo test --all-targets
