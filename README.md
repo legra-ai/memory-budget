@@ -103,6 +103,17 @@ Enable the `jemalloc` feature to expose `SystemJemallocStats` backed by
 `tikv-jemalloc-ctl`. The `heap-profiling` feature adds threshold-driven
 `prof.dump` diagnostics for applications built with jemalloc profiling.
 
+These features are supported on Linux and macOS. Windows uses the default
+system-memory backend. CI tests default behavior on all three platforms and
+allocator features on their supported platforms, including a real allocator
+integration test. Keep the allocator and control crate requirements aligned
+when updating the native jemalloc family.
+
+The minimum supported Rust version is 1.97.1. Main CI is the sole publisher;
+it validates the checkout and extracted archive before publication, then tests
+the actual public crate. Shared pipeline references are immutable and updated
+together by Dependabot.
+
 ## License
 
 Licensed under either of:

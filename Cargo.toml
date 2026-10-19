@@ -4,7 +4,7 @@ version = "0.1.1"
 description = "Process memory budgeting and adaptive cache-capacity coordination"
 authors = ["Jacobus Geluk <jacobus.geluk@dataroad.com>"]
 edition = "2024"
-rust-version = "1.89"
+rust-version = "1.97.1"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/legra-ai/memory-budget"
 documentation = "https://docs.rs/memory-budget"
@@ -14,22 +14,31 @@ categories = ["caching", "memory-management", "asynchronous"]
 build = "build.rs"
 include = [
     "Cargo.toml",
+    "Cargo.lock",
     "README.md",
     "LICENSE-APACHE",
     "LICENSE-MIT",
     "build.rs",
-    "src/**/*.rs",
-    "tests/**/*.rs",
+    "rust-toolchain.toml",
+    "rustfmt-toolchain",
+    "src/**",
+    "tests/**",
 ]
 
+[package.metadata.legra-ci.unsupported-features]
+windows = ["jemalloc", "heap-profiling"]
+
 [dependencies]
-sysinfo = "0.38"
+sysinfo = "0.39"
 tokio = { version = "1", default-features = false, features = ["macros", "rt", "time"] }
 tracing = "0.1"
 tikv-jemalloc-ctl = { version = "0.6", default-features = false, features = ["stats"], optional = true }
 
 [build-dependencies]
-rhusky = "0.0.6"
+rhusky = "2.0.1"
+
+[target.'cfg(unix)'.dev-dependencies]
+tikv-jemallocator = { version = "0.6", default-features = false }
 
 [features]
 default = []

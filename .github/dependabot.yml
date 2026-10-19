@@ -1,25 +1,37 @@
 version: 2
 updates:
   - package-ecosystem: cargo
-    directory: /
+    directory: "/"
     schedule:
       interval: daily
     allow:
       - dependency-type: all
     groups:
-      compatible:
+      compatible-updates:
+        applies-to: version-updates
+        patterns: ["*"]
         update-types: [minor, patch]
-        patterns: ['*']
-      security:
+      security-updates:
         applies-to: security-updates
-        patterns: ['*']
+        patterns: ["*"]
     commit-message:
-      prefix: build
-      include: scope
+      prefix: "build(deps)"
+    open-pull-requests-limit: 10
   - package-ecosystem: github-actions
-    directory: /
+    directory: "/"
     schedule:
       interval: daily
+    groups:
+      shared-policy:
+        applies-to: version-updates
+        patterns: ["legra-ai/github-actions*"]
+      compatible-updates:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: [minor, patch]
+      security-updates:
+        applies-to: security-updates
+        patterns: ["*"]
     commit-message:
-      prefix: ci
-      include: scope
+      prefix: "ci(deps)"
+    open-pull-requests-limit: 10
