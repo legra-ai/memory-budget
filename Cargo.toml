@@ -32,7 +32,7 @@ windows = ["jemalloc", "heap-profiling"]
 sysinfo = "0.39"
 tokio = { version = "1", default-features = false, features = ["macros", "rt", "time"] }
 tracing = "0.1"
-tikv-jemalloc-ctl = { version = "0.6", default-features = false, features = ["stats"], optional = true }
+tikv-jemalloc-ctl = { version = "0.7", default-features = false, features = ["stats"], optional = true }
 
 [build-dependencies]
 rhusky = "2.0.1"
