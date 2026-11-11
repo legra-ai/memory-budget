@@ -2,6 +2,9 @@
 
 mod budget;
 mod config;
+mod footprint;
+#[cfg(test)]
+mod footprint_tests;
 #[cfg(feature = "heap-profiling")]
 mod heap_profile;
 mod jemalloc;

@@ -8,7 +8,8 @@
 Adaptive process-memory budgeting for applications with bounded caches.
 
 `memory-budget` coordinates caches and other memory reporters under a target
-resident-set size. It samples process RSS, applies a pluggable policy, and
+process memory size. It samples the process's swappable footprint, applies a
+pluggable policy, and
 adjusts registered cache ceilings. A Tokio task can drive the periodic ticks;
 the policy itself is synchronous and deterministic, which keeps it easy to
 test.
@@ -55,6 +56,13 @@ the tick use the maximum of OS process usage, jemalloc residency and live heap
 allocation. These overlapping measurements must not be added, and a smaller
 allocator reading must not hide other process memory.
 
+`SystemRss` reports the memory that only swap or compression can reclaim:
+anonymous and shared-memory pages plus swapped (Linux, `RssAnon + RssShmem +
+VmSwap`) or compressed (macOS `phys_footprint`) pages; Windows reports private
+commit. Clean file-backed pages are excluded. The kernel drops and refaults
+them from their file, so memory-mapping a large immutable file never moves the
+reading or trips the abort ceiling.
+
 ## Example
 
 ```rust
@@ -91,7 +99,7 @@ async fn main() {
 
 | Variable | Meaning |
 | --- | --- |
-| `MEMORY_BUDGET_TARGET_MIB` | Soft RSS target; otherwise derived from system RAM |
+| `MEMORY_BUDGET_TARGET_MIB` | Soft process-memory target; otherwise derived from system RAM |
 | `MEMORY_BUDGET_TICK_SECS` | Tick interval, default `5` seconds |
 | `MEMORY_BUDGET_HARD_CEILING_MIB` | Optional hard process ceiling |
 
