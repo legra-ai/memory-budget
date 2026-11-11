@@ -42,7 +42,7 @@ rhusky = "2.0.1"
 
 [target.'cfg(unix)'.dev-dependencies]
 libc = "0.2"
-tikv-jemallocator = { version = "0.6", default-features = false }
+tikv-jemallocator = { version = "0.7", default-features = false }
 
 [features]
 default = []
