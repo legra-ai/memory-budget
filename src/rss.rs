@@ -62,11 +62,12 @@ impl SystemRss {
     ///
     /// # Panics
     ///
-    /// Panics if the platform cannot identify the current process — a
-    /// "cannot happen" condition.
+    /// Panics if `sysinfo` cannot initialise on this platform or the
+    /// platform cannot identify the current process — both "cannot happen"
+    /// conditions.
     #[must_use]
     pub fn new() -> Self {
-        let mut system = System::new();
+        let mut system = System::new().expect("sysinfo cannot initialise on this platform");
         system.refresh_memory();
         Self {
             inner: Mutex::new(SystemRssInner {
