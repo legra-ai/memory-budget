@@ -1,20 +1,24 @@
-//! Process-RSS reader abstraction.
+//! Process-memory reader abstraction.
 //!
-//! Production code uses [`SystemRss`] which delegates to `sysinfo`.
-//! Tests substitute a hand-rolled source so the budget logic can be
-//! driven through specific RSS values without spawning a sub-process.
+//! Production code uses [`SystemRss`], which reads the platform's native
+//! measure of memory that only swap or compression can reclaim. Tests
+//! substitute a hand-rolled source so the budget logic can be driven
+//! through specific values without spawning a sub-process.
 
 use std::sync::Mutex;
 
-use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
+use sysinfo::System;
 
-/// Abstraction over "what is the current process RSS, in bytes".
+use crate::footprint::SwappableFootprint;
+
+/// Abstraction over "how much memory does the current process own that
+/// the operating system cannot reclaim without swapping", in bytes.
 ///
 /// Implementations may cache their reading; the budget calls
 /// [`RssSource::read_rss_bytes`] once per tick and is happy with a
 /// best-effort value.
 pub trait RssSource: Send + Sync {
-    /// Current process RSS in bytes.
+    /// Current process memory in bytes.
     fn read_rss_bytes(&self) -> u64;
 
     /// Installed system RAM in bytes. Used at startup when auto-deriving
@@ -24,14 +28,33 @@ pub trait RssSource: Send + Sync {
     }
 }
 
-/// Live RSS reader backed by [`sysinfo`].
+/// Live reader of the current process's swappable memory footprint.
+///
+/// The reading counts anonymous and private copy-on-write pages,
+/// shared-memory pages (tmpfs, memfd, POSIX shm) and, where the platform
+/// reports them, pages already swapped out or compressed. Clean
+/// file-backed pages — memory-mapped immutable files, executable text,
+/// page cache faulted in by reads — are excluded: the kernel drops and
+/// refaults them from their file, so they can never cause swap. Plain
+/// resident-set size counts them, which lets a process that only maps a
+/// large file look like it is exhausting memory.
+///
+/// | Platform | Measurement |
+/// | --- | --- |
+/// | Linux, Android | `RssAnon + RssShmem + VmSwap` from `/proc/self/status` |
+/// | macOS, iOS | `ri_phys_footprint` from `proc_pid_rusage` |
+/// | Windows | private commit charge (`PrivateUsage`) |
+/// | other | resident-set size |
+///
+/// Every read is a handful of system calls on a buffer reused across
+/// reads, cheap enough for once-per-second sampling.
 pub struct SystemRss {
     inner: Mutex<SystemRssInner>,
 }
 
 struct SystemRssInner {
     system: System,
-    pid: Pid,
+    footprint: SwappableFootprint,
 }
 
 impl SystemRss {
@@ -39,15 +62,17 @@ impl SystemRss {
     ///
     /// # Panics
     ///
-    /// Panics if the current process id is not representable as a
-    /// [`Pid`] on this platform — a "cannot happen" condition.
+    /// Panics if the platform cannot identify the current process — a
+    /// "cannot happen" condition.
     #[must_use]
     pub fn new() -> Self {
-        let pid = sysinfo::get_current_pid().expect("sysinfo cannot resolve current pid");
         let mut system = System::new();
         system.refresh_memory();
         Self {
-            inner: Mutex::new(SystemRssInner { system, pid }),
+            inner: Mutex::new(SystemRssInner {
+                system,
+                footprint: SwappableFootprint::new(),
+            }),
         }
     }
 }
@@ -61,19 +86,8 @@ impl Default for SystemRss {
 impl RssSource for SystemRss {
     fn read_rss_bytes(&self) -> u64 {
         let mut guard = self.inner.lock().expect("system-rss lock");
-        let pid = guard.pid;
-        let refresh = ProcessRefreshKind::nothing().with_memory();
-        let refreshed = guard.system.refresh_processes_specifics(
-            ProcessesToUpdate::Some(&[pid]),
-            true,
-            refresh,
-        );
-        assert_eq!(refreshed, 1, "sysinfo did not refresh the current process");
-        guard
-            .system
-            .process(pid)
-            .map(sysinfo::Process::memory)
-            .expect("sysinfo lost the current process")
+        let SystemRssInner { system, footprint } = &mut *guard;
+        footprint.read_bytes(system)
     }
 
     fn total_ram_bytes(&self) -> u64 {
