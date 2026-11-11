@@ -1,6 +1,6 @@
 [package]
 name = "memory-budget"
-version = "0.1.12"
+version = "0.1.13"
 description = "Process memory budgeting and adaptive cache-capacity coordination"
 authors = ["Jacobus Geluk <jacobus.geluk@dataroad.com>"]
 edition = "2024"
@@ -32,7 +32,7 @@ windows = ["jemalloc", "heap-profiling"]
 sysinfo = "0.40"
 tokio = { version = "1", default-features = false, features = ["macros", "rt", "time"] }
 tracing = "0.1"
-tikv-jemalloc-ctl = { version = "0.6", default-features = false, features = ["stats"], optional = true }
+tikv-jemalloc-ctl = { version = "0.7", default-features = false, features = ["stats"], optional = true }
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 libc = "0.2"
@@ -42,7 +42,7 @@ rhusky = "2.0.1"
 
 [target.'cfg(unix)'.dev-dependencies]
 libc = "0.2"
-tikv-jemallocator = { version = "0.6", default-features = false }
+tikv-jemallocator = { version = "0.7", default-features = false }
 
 [features]
 default = []
